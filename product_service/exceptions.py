@@ -8,6 +8,7 @@ PROMO_NOT_FOUND_DETAIL = "Promo not found"
 PROMO_LINK_NOT_FOUND_DETAIL = "Promo-product link not found"
 PROMO_LINK_ALREADY_EXISTS_DETAIL = "Promo already contains this product"
 INVALID_PROMO_DATES_DETAIL = "Promo end_date must be after start_date"
+FORBIDDEN_DETAIL = "Forbidden"
 
 
 def product_not_found() -> HTTPException:
@@ -40,3 +41,7 @@ def promo_link_already_exists() -> HTTPException:
 
 def invalid_promo_dates() -> HTTPException:
     return HTTPException(status_code=400, detail=INVALID_PROMO_DATES_DETAIL)
+
+
+def forbidden() -> HTTPException:
+    return HTTPException(status_code=403, detail=FORBIDDEN_DETAIL)

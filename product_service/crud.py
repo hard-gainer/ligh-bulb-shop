@@ -178,10 +178,15 @@ def get_reviews(
     )
 
 
-def create_review(db: Session, product_id: int, payload: ReviewCreate) -> Review:
+def create_review(
+    db: Session,
+    product_id: int,
+    user_id: int,
+    payload: ReviewCreate,
+) -> Review:
     review = Review(
         product_id=product_id,
-        user_id=payload.user_id,
+        user_id=user_id,
         rating=payload.rating,
         description=payload.description,
     )
@@ -191,14 +196,13 @@ def create_review(db: Session, product_id: int, payload: ReviewCreate) -> Review
     return review
 
 
-def delete_review(db: Session, review_id: int) -> bool:
-    review = db.query(Review).filter(Review.id == review_id).first()
-    if not review:
-        return False
+def get_review_by_id(db: Session, review_id: int) -> Review | None:
+    return db.query(Review).filter(Review.id == review_id).first()
 
+
+def delete_review(db: Session, review: Review) -> None:
     db.delete(review)
     db.commit()
-    return True
 
 
 def get_product_average_rating(db: Session, product_id: int) -> float:
