@@ -1,15 +1,15 @@
-import base64
-import hashlib
-import hmac
-import json
 import os
 import time
 from dataclasses import dataclass
+from typing import Any
 
 from fastapi import Depends, HTTPException, Request
+import jwt
+from jwt import ExpiredSignatureError, InvalidTokenError
 
 ACCESS_TOKEN_TTL_SECONDS = int(os.getenv("AUTH_ACCESS_TOKEN_TTL", "3600"))
 auth_secret_env = os.getenv("AUTH_SECRET")
+JWT_ALGORITHM = "HS256"
 
 if not auth_secret_env:
     raise ValueError("AUTH_SECRET must be set")
@@ -24,61 +24,27 @@ class AuthUser:
     role: str
 
 
-def _b64url_encode(value: bytes) -> str:
-    return base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")
-
-
-def _b64url_decode(value: str) -> bytes:
-    padding = "=" * ((4 - len(value) % 4) % 4)
-    return base64.urlsafe_b64decode((value + padding).encode("ascii"))
-
-
-def _sign(unsigned_token: str) -> str:
-    signature = hmac.new(
-        AUTH_SECRET.encode("utf-8"),
-        unsigned_token.encode("ascii"),
-        hashlib.sha256,
-    ).digest()
-    return _b64url_encode(signature)
-
-
 def create_access_token(user_id: int, email: str, role: str) -> str:
-    header = {"alg": "HS256", "typ": "JWT"}
     payload = {
         "sub": str(user_id),
         "email": email,
         "role": role,
         "exp": int(time.time()) + ACCESS_TOKEN_TTL_SECONDS,
     }
-
-    encoded_header = _b64url_encode(json.dumps(header, separators=(",", ":")).encode())
-    encoded_payload = _b64url_encode(
-        json.dumps(payload, separators=(",", ":")).encode()
-    )
-    unsigned_token = f"{encoded_header}.{encoded_payload}"
-    signature = _sign(unsigned_token)
-    return f"{unsigned_token}.{signature}"
+    return jwt.encode(payload, AUTH_SECRET, algorithm=JWT_ALGORITHM)
 
 
 def decode_access_token(token: str) -> AuthUser:
-    parts = token.split(".")
-    if len(parts) != 3:
-        raise HTTPException(status_code=401, detail="Invalid access token")
-
-    encoded_header, encoded_payload, encoded_signature = parts
-    unsigned_token = f"{encoded_header}.{encoded_payload}"
-    expected_signature = _sign(unsigned_token)
-    if not hmac.compare_digest(encoded_signature, expected_signature):
-        raise HTTPException(status_code=401, detail="Invalid access token")
-
     try:
-        payload = json.loads(_b64url_decode(encoded_payload).decode("utf-8"))
-    except (ValueError, json.JSONDecodeError):
-        raise HTTPException(status_code=401, detail="Invalid access token")
-
-    exp = payload.get("exp")
-    if not isinstance(exp, int) or exp < int(time.time()):
+        payload: dict[str, Any] = jwt.decode(
+            token,
+            AUTH_SECRET,
+            algorithms=[JWT_ALGORITHM],
+        )
+    except ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Access token expired")
+    except InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid access token")
 
     user_id_raw = payload.get("sub")
     email = payload.get("email")
