@@ -9,7 +9,12 @@ from dataclasses import dataclass
 from fastapi import Depends, HTTPException, Request
 
 ACCESS_TOKEN_TTL_SECONDS = int(os.getenv("AUTH_ACCESS_TOKEN_TTL", "3600"))
-AUTH_SECRET = os.getenv("AUTH_SECRET", "dev-secret")
+auth_secret_env = os.getenv("AUTH_SECRET")
+
+if not auth_secret_env:
+    raise ValueError("AUTH_SECRET must be set")
+
+AUTH_SECRET: str = auth_secret_env
 
 
 @dataclass

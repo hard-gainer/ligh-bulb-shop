@@ -28,7 +28,7 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
-      AUTH_SECRET: ${AUTH_SECRET:-dev-secret}
+      AUTH_SECRET: ${AUTH_SECRET}
     depends_on:
       db:
         condition: service_healthy
@@ -47,7 +47,7 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
-      AUTH_SECRET: ${AUTH_SECRET:-dev-secret}
+      AUTH_SECRET: ${AUTH_SECRET}
     depends_on:
       db:
         condition: service_healthy
@@ -66,7 +66,7 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
-      AUTH_SECRET: ${AUTH_SECRET:-dev-secret}
+      AUTH_SECRET: ${AUTH_SECRET}
     depends_on:
       db:
         condition: service_healthy
