@@ -1,19 +1,11 @@
 import importlib
 from contextlib import asynccontextmanager
-from typing import Any
 from collections.abc import AsyncIterator
+from typing import Any
 
-from fastapi import Depends, FastAPI, HTTPException
-from fastapi.requests import Request
-from fastapi.responses import JSONResponse
+from fastapi import Depends, FastAPI
 from sqlalchemy.orm import Session
 
-from auth_service.auth import (
-    AuthUser,
-    attach_auth_user_to_request,
-    get_current_user,
-    require_admin,
-)
 from product_service import crud
 from product_service.db import Base, engine, get_db
 from product_service.dto import (
@@ -40,7 +32,6 @@ from product_service.dto import (
 )
 from product_service.exceptions import (
     category_not_found,
-    forbidden,
     image_not_found,
     invalid_promo_dates,
     product_not_found,
@@ -59,15 +50,6 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(lifespan=lifespan)
-
-
-@app.middleware("http")
-async def authentication_middleware(request: Request, call_next: Any) -> Any:
-    try:
-        attach_auth_user_to_request(request)
-    except HTTPException as exc:
-        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
-    return await call_next(request)
 
 
 @app.get("/api/v1/products", response_model=list[ProductResponse])
@@ -118,7 +100,6 @@ async def get_product_by_id(product_id: int, db: Session = Depends(get_db)) -> A
 @app.post("/api/v1/products", response_model=ProductResponse)
 async def create_product(
     payload: ProductCreate,
-    _: AuthUser = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> Any:
     found_category = crud.get_category_by_id(db, payload.category_id)
@@ -133,7 +114,6 @@ async def create_product(
 async def update_product(
     product_id: int,
     payload: ProductUpdate,
-    _: AuthUser = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> Any:
     found_product = crud.get_product_by_id(db, product_id)
@@ -153,7 +133,6 @@ async def update_product(
 @app.delete("/api/v1/products/{product_id}", response_model=ProductResponse)
 async def delete_product(
     product_id: int,
-    _: AuthUser = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> Any:
     found_product = crud.get_product_by_id(db, product_id)
@@ -174,7 +153,6 @@ async def get_categories(db: Session = Depends(get_db)) -> Any:
 @app.post("/api/v1/categories", response_model=CategoryResponse)
 async def create_category(
     payload: CategoryCreate,
-    _: AuthUser = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> Any:
     created_category = crud.create_category(db, payload)
@@ -185,7 +163,6 @@ async def create_category(
 async def create_product_image(
     product_id: int,
     payload: ProductImageCreate,
-    _: AuthUser = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> Any:
     found_product = crud.get_product_by_id(db, product_id)
@@ -199,7 +176,6 @@ async def create_product_image(
 @app.delete("/api/v1/products/images/{image_id}")
 async def delete_product_image(
     image_id: int,
-    _: AuthUser = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> Any:
     deleted = crud.delete_product_image(db, image_id)
@@ -227,7 +203,6 @@ async def get_product_reviews(
 async def create_review(
     product_id: int,
     payload: ReviewCreate,
-    current_user: AuthUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Any:
     found_product = crud.get_product_by_id(db, product_id)
@@ -237,7 +212,7 @@ async def create_review(
     created_review = crud.create_review(
         db,
         product_id,
-        user_id=current_user.user_id,
+        user_id=payload.user_id,
         payload=payload,
     )
     return to_review_response(created_review)
@@ -246,15 +221,11 @@ async def create_review(
 @app.delete("/api/v1/reviews/{review_id}")
 async def delete_review(
     review_id: int,
-    current_user: AuthUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Any:
     found_review = crud.get_review_by_id(db, review_id)
     if not found_review:
         raise review_not_found()
-
-    if current_user.role != "ADMIN" and found_review.user_id != current_user.user_id:
-        raise forbidden()
 
     crud.delete_review(db, found_review)
     return {"message": "Review deleted"}
@@ -273,7 +244,6 @@ async def get_active_promos(
 @app.post("/api/v1/promos", response_model=PromoResponse)
 async def create_promo(
     payload: PromoCreate,
-    _: AuthUser = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> Any:
     if payload.end_date <= payload.start_date:
@@ -287,7 +257,6 @@ async def create_promo(
 async def add_product_to_promo(
     promo_id: int,
     product_id: int,
-    _: AuthUser = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> Any:
     found_promo = crud.get_promo_by_id(db, promo_id)
@@ -310,7 +279,6 @@ async def add_product_to_promo(
 async def remove_product_from_promo(
     promo_id: int,
     product_id: int,
-    _: AuthUser = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> Any:
     found_link = crud.get_product_promo_link(db, promo_id, product_id)
