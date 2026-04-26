@@ -1,4 +1,7 @@
+import importlib
+from contextlib import asynccontextmanager
 from typing import Any
+from collections.abc import AsyncIterator
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.requests import Request
@@ -12,7 +15,7 @@ from auth_service.auth import (
     require_admin,
 )
 from product_service import crud
-from product_service.db import get_db
+from product_service.db import Base, engine, get_db
 from product_service.dto import (
     CategoryCreate,
     CategoryResponse,
@@ -47,7 +50,15 @@ from product_service.exceptions import (
     review_not_found,
 )
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    importlib.import_module("product_service.schemas")
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.middleware("http")

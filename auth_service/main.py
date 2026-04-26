@@ -1,4 +1,7 @@
+import importlib
+from contextlib import asynccontextmanager
 from typing import Any
+from collections.abc import AsyncIterator
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.requests import Request
@@ -6,7 +9,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from auth_service import crud
-from auth_service.db import get_db
+from auth_service.db import Base, engine, get_db
 from auth_service.dto import (
     RefreshRequest,
     TokenResponse,
@@ -28,7 +31,15 @@ from auth_service.auth import (
     get_current_user,
 )
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    importlib.import_module("auth_service.schemas")
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.middleware("http")

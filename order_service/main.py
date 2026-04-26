@@ -1,4 +1,7 @@
+import importlib
+from contextlib import asynccontextmanager
 from typing import Any
+from collections.abc import AsyncIterator
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.requests import Request
@@ -12,7 +15,7 @@ from auth_service.auth import (
     require_admin,
 )
 from order_service import crud
-from order_service.db import get_db
+from order_service.db import Base, engine, get_db
 from order_service.dto import (
     OrderCreate,
     OrderResponse,
@@ -21,7 +24,15 @@ from order_service.dto import (
 )
 from order_service.exceptions import order_access_forbidden, order_not_found
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    importlib.import_module("order_service.schemas")
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.middleware("http")
