@@ -1,11 +1,39 @@
+import os
+
+import httpx
 from sqlalchemy.orm import Session
 
 from order_service.dto import OrderCreate, OrderStatus
+from order_service.exceptions import product_not_found, product_service_unavailable
 from order_service.schemas import Order, OrderProduct
+
+PRODUCT_SERVICE_URL = os.getenv("PRODUCT_SERVICE_URL", "http://product_service:8000")
 
 
 def _get_actual_product_price(product_id: int) -> float:
-    return float(100 + product_id * 10)
+    endpoint = f"{PRODUCT_SERVICE_URL.rstrip('/')}/api/v1/products/{product_id}"
+
+    try:
+        response = httpx.get(endpoint, timeout=5.0)
+    except httpx.RequestError:
+        raise product_service_unavailable()
+
+    if response.status_code == 404:
+        raise product_not_found(product_id)
+
+    if response.status_code >= 400:
+        raise product_service_unavailable()
+
+    try:
+        payload = response.json()
+    except ValueError:
+        raise product_service_unavailable()
+
+    price = payload.get("price")
+    if not isinstance(price, int | float):
+        raise product_service_unavailable()
+
+    return float(price)
 
 
 def create_order(db: Session, payload: OrderCreate) -> Order:
