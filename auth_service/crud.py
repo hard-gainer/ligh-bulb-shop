@@ -11,6 +11,8 @@ from auth_service.schemas import RefreshToken, User
 
 PASSWORD_SALT = os.getenv("AUTH_PASSWORD_SALT", "auth-salt")
 REFRESH_TOKEN_TTL_DAYS = int(os.getenv("AUTH_REFRESH_TOKEN_TTL_DAYS", "14"))
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@admin.com")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin1234")
 
 
 def _hash_password(password: str) -> str:
@@ -91,6 +93,19 @@ def revoke_refresh_token(db: Session, refresh_token: RefreshToken) -> RefreshTok
     db.commit()
     db.refresh(refresh_token)
     return refresh_token
+
+
+def seed_admin(db: Session) -> None:
+    if get_user_by_email(db, ADMIN_EMAIL):
+        return
+    admin = User(
+        email=ADMIN_EMAIL,
+        password_hash=_hash_password(ADMIN_PASSWORD),
+        role=UserRole.ADMIN.value,
+        is_active=True,
+    )
+    db.add(admin)
+    db.commit()
 
 
 def update_user(db: Session, user: User, payload: UserUpdate) -> User:

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 
 from auth_service import crud
-from auth_service.db import Base, engine, get_db
+from auth_service.db import Base, SessionLocal, engine, get_db
 from auth_service.dto import (
     RefreshRequest,
     TokenResponse,
@@ -37,6 +37,11 @@ from auth_service.auth import (
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     importlib.import_module("auth_service.schemas")
     Base.metadata.create_all(bind=engine)
+    db = SessionLocal()
+    try:
+        crud.seed_admin(db)
+    finally:
+        db.close()
     yield
 
 
